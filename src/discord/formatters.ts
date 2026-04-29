@@ -8,7 +8,7 @@ export function formatFoodItem(item: FoodItem, timezone: string, now = new Date(
 
   return [
     `* **${item.name}**`,
-    `Status: ${item.status ?? 'Unknown'}`,
+    item.status ? `Status: ${item.status}` : null,
     `Expiration: ${expiration}`,
     `Location: ${item.location ?? 'Unknown'}`,
     item.quantity ? `Quantity: ${item.quantity}` : null,
