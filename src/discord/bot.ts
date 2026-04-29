@@ -38,6 +38,8 @@ interface CommandContext {
   actorName: string;
 }
 
+const PLAIN_TEXT_TRIGGER = 'hey kirby,';
+
 export class DiscordFoodBot {
   readonly client: Client;
   readonly cooldownManager = new CooldownManager(5_000);
@@ -253,19 +255,25 @@ export class DiscordFoodBot {
 
     if (audioAttachment) {
       const transcript = await this.handleAudioAttachment(audioAttachment.url);
-      const reply = await this.executeParsedCommand(transcript, {
+      const triggeredTranscript = stripTriggerPhrase(transcript);
+      if (!triggeredTranscript) {
+        return;
+      }
+
+      const reply = await this.executeParsedCommand(triggeredTranscript, {
         requestSource: 'voice',
         actorName: message.author.username
       });
-      await message.reply(`Transcript: "${transcript}"\n\n${reply}`);
+      await message.reply(`Transcript: "${triggeredTranscript}"\n\n${reply}`);
       return;
     }
 
-    if (!message.content.trim()) {
+    const triggeredMessage = stripTriggerPhrase(message.content);
+    if (!triggeredMessage) {
       return;
     }
 
-    const reply = await this.executeParsedCommand(message.content, {
+    const reply = await this.executeParsedCommand(triggeredMessage, {
       requestSource: 'text',
       actorName: message.author.username
     });
@@ -439,6 +447,20 @@ export class DiscordFoodBot {
 
     return channel as GuildTextBasedChannel;
   }
+}
+
+export function stripTriggerPhrase(message: string): string | null {
+  const trimmedMessage = message.trim();
+  if (trimmedMessage.length === 0) {
+    return null;
+  }
+
+  if (trimmedMessage.toLowerCase().startsWith(PLAIN_TEXT_TRIGGER)) {
+    const stripped = trimmedMessage.slice(PLAIN_TEXT_TRIGGER.length).trim();
+    return stripped.length > 0 ? stripped : null;
+  }
+
+  return null;
 }
 
 async function replySafely(interaction: ChatInputCommandInteraction, content: string): Promise<void> {
