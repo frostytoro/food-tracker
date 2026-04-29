@@ -1,6 +1,3 @@
-export const LOCATION_VALUES = ['Fridge', 'Freezer', 'Pantry', 'Counter', 'Other'] as const;
-export type FoodLocation = (typeof LOCATION_VALUES)[number];
-
 export const ACTION_VALUES = [
   'add_food',
   'update_food',
@@ -16,7 +13,7 @@ export interface ParsedFoodCommand {
   action: FoodAction;
   itemName: string | null;
   expirationDate: string | null;
-  location: FoodLocation | null;
+  location: string | null;
   quantity: string | null;
   category: string | null;
   notes: string | null;

@@ -2,13 +2,13 @@ import type OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import type { ParsedFoodCommand } from '../types/food.js';
-import { ACTION_VALUES, LOCATION_VALUES } from '../types/food.js';
+import { ACTION_VALUES } from '../types/food.js';
 
 const parsedFoodCommandSchema = z.object({
   action: z.enum(ACTION_VALUES),
   itemName: z.string().nullable(),
   expirationDate: z.string().nullable(),
-  location: z.enum(LOCATION_VALUES).nullable(),
+  location: z.string().nullable(),
   quantity: z.string().nullable(),
   category: z.string().nullable(),
   notes: z.string().nullable(),

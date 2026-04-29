@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  type ApplicationCommandOptionChoiceData,
   ChannelType,
   Client,
   Events,
@@ -9,6 +10,7 @@ import {
   MessageFlags,
   REST,
   Routes,
+  type AutocompleteInteraction,
   type ChatInputCommandInteraction,
   type GuildTextBasedChannel,
   type Message
@@ -20,7 +22,7 @@ import type { Logger } from '../utils/logger.js';
 import type { NotionFoodService } from '../notion/service.js';
 import { CooldownManager } from './cooldown.js';
 import { slashCommands } from './commands.js';
-import { formatExpiringReport, formatFoodItem, helpMessage } from './formatters.js';
+import { formatExpiringReport, formatFoodItem, formatFoodListPage, helpMessage } from './formatters.js';
 import { ensureIsoDate, getTodayInTimezone, normalizeDateInput } from '../utils/date.js';
 
 interface BotDependencies {
@@ -73,6 +75,17 @@ export class DiscordFoodBot {
 
     this.client.on(Events.InteractionCreate, (interaction) => {
       void (async () => {
+        if (interaction.isAutocomplete()) {
+          try {
+            await this.handleAutocomplete(interaction);
+          } catch (error) {
+            this.deps.logger.error('Failed handling autocomplete interaction.', {
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+          return;
+        }
+
         if (!interaction.isChatInputCommand()) {
           return;
         }
@@ -208,12 +221,9 @@ export class DiscordFoodBot {
         return;
       }
       case 'list-food': {
-        const items = await this.deps.notionService.listActiveFoodItems();
-        const content =
-          items.length > 0
-            ? items.map((item) => formatFoodItem(item, this.deps.env.TIMEZONE)).join('\n\n')
-            : 'No active food items found.';
-        await interaction.reply(content);
+        const page = interaction.options.getInteger('page') ?? 1;
+        const items = await this.deps.notionService.listCurrentFoodItems(this.deps.env.TIMEZONE);
+        await interaction.reply(formatFoodListPage(items, page, 10, this.deps.env.TIMEZONE));
         return;
       }
       case 'expiring': {
@@ -260,6 +270,33 @@ export class DiscordFoodBot {
       actorName: message.author.username
     });
     await message.reply(reply);
+  }
+
+  private async handleAutocomplete(interaction: AutocompleteInteraction): Promise<void> {
+    const focused = interaction.options.getFocused(true);
+    const query = focused.value.toLowerCase();
+    let options: string[] = [];
+
+    if (focused.name === 'category') {
+      options = await this.deps.notionService.getPropertyOptions(['Category']);
+    } else if (focused.name === 'location') {
+      options = await this.deps.notionService.getPropertyOptions(['Location']);
+    } else {
+      await interaction.respond([]);
+      return;
+    }
+
+    const filtered = options
+      .filter((option) => option.toLowerCase().includes(query))
+      .slice(0, 25)
+      .map(
+        (option): ApplicationCommandOptionChoiceData<string> => ({
+          name: option,
+          value: option
+        })
+      );
+
+    await interaction.respond(filtered);
   }
 
   private async handleAudioAttachment(url: string): Promise<string> {
@@ -374,10 +411,8 @@ export class DiscordFoodBot {
         return `Marked **${match.name}** as **Removed**.`;
       }
       case 'list_food': {
-        const items = await this.deps.notionService.listActiveFoodItems();
-        return items.length > 0
-          ? items.map((item) => formatFoodItem(item, this.deps.env.TIMEZONE)).join('\n\n')
-          : 'No active food items found.';
+        const items = await this.deps.notionService.listCurrentFoodItems(this.deps.env.TIMEZONE);
+        return formatFoodListPage(items, 1, 10, this.deps.env.TIMEZONE);
       }
       case 'expiring_food': {
         const days = parsed.days ?? this.deps.env.EXPIRING_SOON_DAYS;

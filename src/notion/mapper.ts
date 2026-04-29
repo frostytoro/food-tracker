@@ -7,6 +7,7 @@ export type NotionPropertyKind =
   | 'rich_text'
   | 'number'
   | 'select'
+  | 'multi_select'
   | 'last_edited_time';
 
 export interface DatabasePropertyShape {
@@ -51,6 +52,14 @@ function setTextOrSelect(
         select: {
           name: value
         }
+      }
+    };
+  }
+
+  if (kind === 'multi_select') {
+    return {
+      [propertyName]: {
+        multi_select: [{ name: value }]
       }
     };
   }
@@ -199,6 +208,10 @@ function readPlainTextFromProperty(property: unknown): string | null {
     return typeof property.select.name === 'string' ? property.select.name : null;
   }
 
+  if ('multi_select' in property && Array.isArray(property.multi_select)) {
+    return property.multi_select.map(readNamedOption).filter(Boolean).join(', ') || null;
+  }
+
   if ('number' in property && typeof property.number === 'number') {
     return String(property.number);
   }
@@ -209,6 +222,14 @@ function readPlainTextFromProperty(property: unknown): string | null {
 function readPlainTextValue(item: unknown): string {
   if (item && typeof item === 'object' && 'plain_text' in item && typeof item.plain_text === 'string') {
     return item.plain_text;
+  }
+
+  return '';
+}
+
+function readNamedOption(item: unknown): string {
+  if (item && typeof item === 'object' && 'name' in item && typeof item.name === 'string') {
+    return item.name;
   }
 
   return '';

@@ -7,7 +7,7 @@ export function formatFoodItem(item: FoodItem, timezone: string, now = new Date(
     : 'No expiration set';
 
   return [
-    `• **${item.name}**`,
+    `* **${item.name}**`,
     `Status: ${item.status ?? 'Unknown'}`,
     `Expiration: ${expiration}`,
     `Location: ${item.location ?? 'Unknown'}`,
@@ -35,7 +35,47 @@ export function formatExpiringReport(
       ? expiredItems.map((item) => formatFoodItem(item, timezone, now)).join('\n\n')
       : 'No items are already expired.';
 
-  return [`## Expiring Soon`, soonSection, `## Already Expired`, expiredSection].join('\n\n');
+  return ['## Expiring Soon', soonSection, '## Already Expired', expiredSection].join('\n\n');
+}
+
+export function formatFoodListPage(
+  items: FoodItem[],
+  page: number,
+  pageSize: number,
+  timezone: string
+): string {
+  if (items.length === 0) {
+    return 'No non-expired food items found.';
+  }
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const pageItems = items.slice(startIndex, startIndex + pageSize);
+
+  const lines = pageItems.map((item, index) => {
+    const details = [
+      item.expirationDate ? `expires ${formatFriendlyDate(item.expirationDate, timezone)}` : null,
+      item.location ? `location: ${item.location}` : null,
+      item.category ? `category: ${item.category}` : null,
+      item.quantity ? `qty: ${item.quantity}` : null
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    return `${startIndex + index + 1}. **${item.name}**${details ? ` - ${details}` : ''}`;
+  });
+
+  return [
+    `Non-expired foods, page ${currentPage} of ${totalPages}`,
+    `Showing ${pageItems.length} of ${items.length} items`,
+    '',
+    ...lines,
+    '',
+    totalPages > 1 ? `Use \`/list-food page:${Math.min(currentPage + 1, totalPages)}\` to see more.` : null
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function helpMessage(): string {
@@ -46,7 +86,7 @@ export function helpMessage(): string {
     '/add-food name:<item> expiration:<date>',
     '/update-food name:<item> expiration:<date>',
     '/remove-food name:<item>',
-    '/list-food',
+    '/list-food page:<number>',
     '/expiring days:<number>',
     '/help',
     '',
@@ -59,4 +99,3 @@ export function helpMessage(): string {
     'Attach or send a Discord voice message in the allowed channel and I will transcribe it before making any Notion changes.'
   ].join('\n');
 }
-

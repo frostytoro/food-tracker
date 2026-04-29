@@ -2,7 +2,6 @@ import {
   ApplicationCommandOptionType,
   type RESTPostAPIApplicationCommandsJSONBody
 } from 'discord.js';
-import { LOCATION_VALUES } from '../types/food.js';
 
 export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
   {
@@ -26,7 +25,7 @@ export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
         description: 'Where the item is stored',
         type: ApplicationCommandOptionType.String,
         required: false,
-        choices: LOCATION_VALUES.map((value) => ({ name: value, value }))
+        autocomplete: true
       },
       {
         name: 'quantity',
@@ -38,7 +37,8 @@ export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
         name: 'category',
         description: 'Category, such as produce or dairy',
         type: ApplicationCommandOptionType.String,
-        required: false
+        required: false,
+        autocomplete: true
       },
       {
         name: 'notes',
@@ -69,7 +69,7 @@ export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
         description: 'Updated location',
         type: ApplicationCommandOptionType.String,
         required: false,
-        choices: LOCATION_VALUES.map((value) => ({ name: value, value }))
+        autocomplete: true
       },
       {
         name: 'quantity',
@@ -81,7 +81,8 @@ export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
         name: 'category',
         description: 'Updated category',
         type: ApplicationCommandOptionType.String,
-        required: false
+        required: false,
+        autocomplete: true
       },
       {
         name: 'notes',
@@ -115,7 +116,16 @@ export const slashCommands: RESTPostAPIApplicationCommandsJSONBody[] = [
   },
   {
     name: 'list-food',
-    description: 'List active food items in Notion.'
+    description: 'List non-expired food items in Notion.',
+    options: [
+      {
+        name: 'page',
+        description: 'Page number to view',
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 1
+      }
+    ]
   },
   {
     name: 'expiring',

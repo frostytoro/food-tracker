@@ -13,6 +13,14 @@ import {
 const SOFT_DELETE_STATUS = 'Removed';
 const ACTIVE_EXCLUDED_STATUSES = new Set(['Removed', 'Used']);
 
+function readOptionName(option: unknown): string | null {
+  if (option && typeof option === 'object' && 'name' in option && typeof option.name === 'string') {
+    return option.name;
+  }
+
+  return null;
+}
+
 function isFullPage(page: unknown): page is { id: string; properties: Record<string, unknown> } {
   return Boolean(page && typeof page === 'object' && 'id' in page && 'properties' in page);
 }
@@ -28,6 +36,7 @@ function getPropertyKind(property: unknown): NotionPropertyKind | null {
     type === 'rich_text' ||
     type === 'number' ||
     type === 'select' ||
+    type === 'multi_select' ||
     type === 'last_edited_time'
     ? type
     : null;
@@ -36,6 +45,7 @@ function getPropertyKind(property: unknown): NotionPropertyKind | null {
 export class NotionFoodService {
   private readonly notion: Client;
   private propertyShape: DatabasePropertyShape | null = null;
+  private rawProperties: Record<string, unknown> | null = null;
 
   constructor(
     private readonly apiKey: string,
@@ -63,6 +73,7 @@ export class NotionFoodService {
       }
     }
 
+    this.rawProperties = database.properties;
     this.propertyShape = propertyShape;
     this.validateRequiredProperties(propertyShape);
     return propertyShape;
@@ -145,6 +156,15 @@ export class NotionFoodService {
     return pages.filter((item) => !ACTIVE_EXCLUDED_STATUSES.has(item.status ?? ''));
   }
 
+  async listCurrentFoodItems(timezone: string, now = new Date()): Promise<FoodItem[]> {
+    const pages = await this.listActiveFoodItems();
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone
+    }).format(now);
+
+    return pages.filter((item) => item.expirationDate !== null && item.expirationDate >= today);
+  }
+
   async findItemsExpiringWithin(days: number, timezone: string, now = new Date()): Promise<FoodItem[]> {
     const pages = await this.queryDatabase();
     const today = new Intl.DateTimeFormat('en-CA', {
@@ -221,6 +241,47 @@ export class NotionFoodService {
     }
 
     return items;
+  }
+
+  async getPropertyOptions(aliases: readonly string[]): Promise<string[]> {
+    await this.ensureSchema();
+
+    if (!this.rawProperties) {
+      return [];
+    }
+
+    for (const alias of aliases) {
+      const property = this.rawProperties[alias];
+      if (!property || typeof property !== 'object' || !('type' in property)) {
+        continue;
+      }
+
+      if (
+        property.type === 'select' &&
+        'select' in property &&
+        property.select &&
+        typeof property.select === 'object' &&
+        'options' in property.select &&
+        Array.isArray(property.select.options)
+      ) {
+        return property.select.options.map(readOptionName).filter((option): option is string => option !== null);
+      }
+
+      if (
+        property.type === 'multi_select' &&
+        'multi_select' in property &&
+        property.multi_select &&
+        typeof property.multi_select === 'object' &&
+        'options' in property.multi_select &&
+        Array.isArray(property.multi_select.options)
+      ) {
+        return property.multi_select.options
+          .map(readOptionName)
+          .filter((option): option is string => option !== null);
+      }
+    }
+
+    return [];
   }
 
   private validateRequiredProperties(schema: DatabasePropertyShape): void {
