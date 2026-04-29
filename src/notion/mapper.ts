@@ -248,7 +248,9 @@ export function mapNotionPageToFoodItem(page: {
   properties: Record<string, unknown>;
 }): FoodItem {
   const expirationDate =
-    readDateStart(page.properties.Expiration) ?? readDateStart(page.properties['Expiration Date']);
+    'Expiration' in page.properties
+      ? readDateStart(page.properties.Expiration)
+      : readDateStart(page.properties['Expiration Date']);
   const lastUpdated =
     readDateStart(page.properties['Last Updated']) ??
     readLastEditedTime(page.properties['Last edited time']);

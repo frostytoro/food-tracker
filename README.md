@@ -57,9 +57,11 @@ For your current database from the screenshot, the important columns are:
 
 - `Item`
 - `Category`
-- `Expiration Date`
+- `Expiration`
 - `Expiration Notes`
 - `Last edited time`
+
+If both `Expiration` and `Expiration Date` exist, the bot now treats `Expiration` as the source of truth for reminders, expiring-item checks, and expired-item checks.
 
 ## Environment Variables
 
