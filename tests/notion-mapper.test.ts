@@ -5,36 +5,35 @@ describe('Notion mapper', () => {
   it('maps a food item into create properties', () => {
     const payload = buildFoodCreateProperties(
       {
-        Location: 'select',
-        Quantity: 'rich_text',
+        Item: 'title',
         Category: 'rich_text',
-        Status: 'select',
-        'Added By': 'rich_text',
-        Notes: 'rich_text',
-        'Last Updated': 'date'
+        'Expiration Date': 'date',
+        'Expiration Notes': 'rich_text',
+        'Last edited time': 'last_edited_time'
       },
       {
         itemName: 'Broccoli',
         expirationDate: '2026-05-12',
-        location: 'Pantry',
-        quantity: '1 bunch',
         category: 'Produce',
-        status: 'Active',
-        addedBy: 'tester',
         notes: 'Fresh'
       }
     );
 
-    expect(payload.Name).toBeDefined();
-    expect(payload.Expiration).toEqual({
+    expect(payload.Item).toBeDefined();
+    expect(payload['Expiration Date']).toEqual({
       date: {
         start: '2026-05-12'
       }
     });
-    expect(payload.Location).toEqual({
-      select: {
-        name: 'Pantry'
-      }
+    expect(payload['Expiration Notes']).toEqual({
+      rich_text: [
+        {
+          type: 'text',
+          text: {
+            content: 'Fresh'
+          }
+        }
+      ]
     });
   });
 });

@@ -6,11 +6,24 @@ export type NotionPropertyKind =
   | 'date'
   | 'rich_text'
   | 'number'
-  | 'select';
+  | 'select'
+  | 'last_edited_time';
 
 export interface DatabasePropertyShape {
   [propertyName: string]: NotionPropertyKind;
 }
+
+const PROPERTY_ALIASES = {
+  title: ['Name', 'Item'],
+  expirationDate: ['Expiration', 'Expiration Date'],
+  location: ['Location'],
+  quantity: ['Quantity'],
+  category: ['Category'],
+  status: ['Status'],
+  addedBy: ['Added By'],
+  notes: ['Notes', 'Expiration Notes'],
+  lastUpdated: ['Last Updated', 'Last edited time']
+} as const;
 
 function buildRichText(content: string) {
   return [
@@ -70,42 +83,75 @@ function setNumber(propertyName: string, value: string | null | undefined) {
   };
 }
 
+function getExistingPropertyName(
+  schema: DatabasePropertyShape,
+  aliases: readonly string[]
+): string | null {
+  for (const alias of aliases) {
+    if (alias in schema) {
+      return alias;
+    }
+  }
+
+  return null;
+}
+
+function setDateProperty(propertyName: string, value: string | null | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    [propertyName]: {
+      date: {
+        start: value
+      }
+    }
+  };
+}
+
+function getExistingProperty(schema: DatabasePropertyShape, aliases: readonly string[]) {
+  const propertyName = getExistingPropertyName(schema, aliases);
+  if (!propertyName) {
+    return null;
+  }
+
+  const kind = schema[propertyName];
+  if (!kind) {
+    return null;
+  }
+
+  return { propertyName, kind };
+}
+
 export function buildFoodCreateProperties(
   schema: DatabasePropertyShape,
   input: FoodMutationInput
 ): NonNullable<CreatePageParameters['properties']> {
+  const titleProperty = getExistingPropertyName(schema, PROPERTY_ALIASES.title) ?? 'Name';
+  const expirationProperty = getExistingProperty(schema, PROPERTY_ALIASES.expirationDate);
+  const locationProperty = getExistingProperty(schema, PROPERTY_ALIASES.location);
+  const quantityProperty = getExistingProperty(schema, PROPERTY_ALIASES.quantity);
+  const categoryProperty = getExistingProperty(schema, PROPERTY_ALIASES.category);
+  const statusProperty = getExistingProperty(schema, PROPERTY_ALIASES.status);
+  const addedByProperty = getExistingProperty(schema, PROPERTY_ALIASES.addedBy);
+  const notesProperty = getExistingProperty(schema, PROPERTY_ALIASES.notes);
+
   return {
-    Name: {
+    [titleProperty]: {
       title: buildRichText(input.itemName)
     },
-    ...(input.expirationDate
-      ? {
-          Expiration: {
-            date: {
-              start: input.expirationDate
-            }
-          }
-        }
+    ...(expirationProperty ? setDateProperty(expirationProperty.propertyName, input.expirationDate) : {}),
+    ...(locationProperty ? setTextOrSelect(locationProperty.propertyName, input.location, locationProperty.kind) : {}),
+    ...(quantityProperty
+      ? quantityProperty.kind === 'number'
+        ? setNumber(quantityProperty.propertyName, input.quantity)
+        : setTextOrSelect(quantityProperty.propertyName, input.quantity, quantityProperty.kind)
       : {}),
-    ...(schema.Location ? setTextOrSelect('Location', input.location, schema.Location) : {}),
-    ...(schema.Quantity
-      ? schema.Quantity === 'number'
-        ? setNumber('Quantity', input.quantity)
-        : setTextOrSelect('Quantity', input.quantity, schema.Quantity)
-      : {}),
-    ...(schema.Category ? setTextOrSelect('Category', input.category, schema.Category) : {}),
-    ...(schema.Status ? setTextOrSelect('Status', input.status ?? 'Active', schema.Status) : {}),
-    ...(schema['Added By'] ? setTextOrSelect('Added By', input.addedBy, schema['Added By']) : {}),
-    ...(schema.Notes ? setTextOrSelect('Notes', input.notes, schema.Notes) : {}),
-    ...(schema['Last Updated']
-      ? {
-          'Last Updated': {
-            date: {
-              start: new Date().toISOString()
-            }
-          }
-        }
-      : {})
+    ...(categoryProperty ? setTextOrSelect(categoryProperty.propertyName, input.category, categoryProperty.kind) : {}),
+    ...(statusProperty ? setTextOrSelect(statusProperty.propertyName, input.status ?? 'Active', statusProperty.kind) : {}),
+    ...(addedByProperty ? setTextOrSelect(addedByProperty.propertyName, input.addedBy, addedByProperty.kind) : {}),
+    ...(notesProperty ? setTextOrSelect(notesProperty.propertyName, input.notes, notesProperty.kind) : {})
   };
 }
 
@@ -113,35 +159,26 @@ export function buildFoodUpdateProperties(
   schema: DatabasePropertyShape,
   input: Omit<FoodMutationInput, 'itemName'>
 ): NonNullable<UpdatePageParameters['properties']> {
+  const expirationProperty = getExistingProperty(schema, PROPERTY_ALIASES.expirationDate);
+  const locationProperty = getExistingProperty(schema, PROPERTY_ALIASES.location);
+  const quantityProperty = getExistingProperty(schema, PROPERTY_ALIASES.quantity);
+  const categoryProperty = getExistingProperty(schema, PROPERTY_ALIASES.category);
+  const statusProperty = getExistingProperty(schema, PROPERTY_ALIASES.status);
+  const addedByProperty = getExistingProperty(schema, PROPERTY_ALIASES.addedBy);
+  const notesProperty = getExistingProperty(schema, PROPERTY_ALIASES.notes);
+
   return {
-    ...(input.expirationDate
-      ? {
-          Expiration: {
-            date: {
-              start: input.expirationDate
-            }
-          }
-        }
+    ...(expirationProperty ? setDateProperty(expirationProperty.propertyName, input.expirationDate) : {}),
+    ...(locationProperty ? setTextOrSelect(locationProperty.propertyName, input.location, locationProperty.kind) : {}),
+    ...(quantityProperty
+      ? quantityProperty.kind === 'number'
+        ? setNumber(quantityProperty.propertyName, input.quantity)
+        : setTextOrSelect(quantityProperty.propertyName, input.quantity, quantityProperty.kind)
       : {}),
-    ...(schema.Location ? setTextOrSelect('Location', input.location, schema.Location) : {}),
-    ...(schema.Quantity
-      ? schema.Quantity === 'number'
-        ? setNumber('Quantity', input.quantity)
-        : setTextOrSelect('Quantity', input.quantity, schema.Quantity)
-      : {}),
-    ...(schema.Category ? setTextOrSelect('Category', input.category, schema.Category) : {}),
-    ...(schema.Status ? setTextOrSelect('Status', input.status, schema.Status) : {}),
-    ...(schema['Added By'] ? setTextOrSelect('Added By', input.addedBy, schema['Added By']) : {}),
-    ...(schema.Notes ? setTextOrSelect('Notes', input.notes, schema.Notes) : {}),
-    ...(schema['Last Updated']
-      ? {
-          'Last Updated': {
-            date: {
-              start: new Date().toISOString()
-            }
-          }
-        }
-      : {})
+    ...(categoryProperty ? setTextOrSelect(categoryProperty.propertyName, input.category, categoryProperty.kind) : {}),
+    ...(statusProperty ? setTextOrSelect(statusProperty.propertyName, input.status, statusProperty.kind) : {}),
+    ...(addedByProperty ? setTextOrSelect(addedByProperty.propertyName, input.addedBy, addedByProperty.kind) : {}),
+    ...(notesProperty ? setTextOrSelect(notesProperty.propertyName, input.notes, notesProperty.kind) : {})
   };
 }
 
@@ -177,25 +214,60 @@ function readPlainTextValue(item: unknown): string {
   return '';
 }
 
+function readDateStart(property: unknown): string | null {
+  if (
+    property &&
+    typeof property === 'object' &&
+    'date' in property &&
+    property.date &&
+    typeof property.date === 'object' &&
+    'start' in property.date &&
+    (typeof property.date.start === 'string' || property.date.start === null)
+  ) {
+    return property.date.start ?? null;
+  }
+
+  return null;
+}
+
+function readLastEditedTime(property: unknown): string | null {
+  if (
+    property &&
+    typeof property === 'object' &&
+    'last_edited_time' in property &&
+    (typeof property.last_edited_time === 'string' || property.last_edited_time === null)
+  ) {
+    return property.last_edited_time ?? null;
+  }
+
+  return null;
+}
+
 export function mapNotionPageToFoodItem(page: {
   id: string;
   properties: Record<string, unknown>;
 }): FoodItem {
-  const expirationProperty = page.properties.Expiration as { date?: { start?: string | null } } | undefined;
-  const lastUpdatedProperty = page.properties['Last Updated'] as
-    | { date?: { start?: string | null } }
-    | undefined;
+  const expirationDate =
+    readDateStart(page.properties.Expiration) ?? readDateStart(page.properties['Expiration Date']);
+  const lastUpdated =
+    readDateStart(page.properties['Last Updated']) ??
+    readLastEditedTime(page.properties['Last edited time']);
 
   return {
     id: page.id,
-    name: readPlainTextFromProperty(page.properties.Name) ?? 'Untitled',
-    expirationDate: expirationProperty?.date?.start ?? null,
+    name:
+      readPlainTextFromProperty(page.properties.Name) ??
+      readPlainTextFromProperty(page.properties.Item) ??
+      'Untitled',
+    expirationDate,
     location: readPlainTextFromProperty(page.properties.Location),
     quantity: readPlainTextFromProperty(page.properties.Quantity),
     category: readPlainTextFromProperty(page.properties.Category),
     status: readPlainTextFromProperty(page.properties.Status),
     addedBy: readPlainTextFromProperty(page.properties['Added By']),
-    notes: readPlainTextFromProperty(page.properties.Notes),
-    lastUpdated: lastUpdatedProperty?.date?.start ?? null
+    notes:
+      readPlainTextFromProperty(page.properties.Notes) ??
+      readPlainTextFromProperty(page.properties['Expiration Notes']),
+    lastUpdated
   };
 }

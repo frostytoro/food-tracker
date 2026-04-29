@@ -27,7 +27,8 @@ function getPropertyKind(property: unknown): NotionPropertyKind | null {
     type === 'date' ||
     type === 'rich_text' ||
     type === 'number' ||
-    type === 'select'
+    type === 'select' ||
+    type === 'last_edited_time'
     ? type
     : null;
 }
@@ -63,6 +64,7 @@ export class NotionFoodService {
     }
 
     this.propertyShape = propertyShape;
+    this.validateRequiredProperties(propertyShape);
     return propertyShape;
   }
 
@@ -117,7 +119,25 @@ export class NotionFoodService {
   }
 
   async softRemoveFood(pageId: string, status = SOFT_DELETE_STATUS): Promise<void> {
-    await this.updateFood(pageId, { status });
+    const schema = await this.ensureSchema();
+
+    if ('Status' in schema) {
+      await this.updateFood(pageId, { status });
+      return;
+    }
+
+    if (this.dryRun) {
+      this.logger.info('Dry run enabled. Skipping Notion archive.', {
+        pageId,
+        status
+      });
+      return;
+    }
+
+    await this.notion.pages.update({
+      page_id: pageId,
+      archived: true
+    });
   }
 
   async listActiveFoodItems(): Promise<FoodItem[]> {
@@ -170,9 +190,11 @@ export class NotionFoodService {
   }
 
   async findByName(name: string): Promise<FoodItem[]> {
+    const schema = await this.ensureSchema();
+    const titleProperty = 'Name' in schema ? 'Name' : 'Item';
     const pages = await this.queryDatabase({
       filter: {
-        property: 'Name',
+        property: titleProperty,
         title: {
           contains: name
         }
@@ -199,6 +221,21 @@ export class NotionFoodService {
     }
 
     return items;
+  }
+
+  private validateRequiredProperties(schema: DatabasePropertyShape): void {
+    const hasTitleProperty = 'Name' in schema || 'Item' in schema;
+    const hasExpirationProperty = 'Expiration' in schema || 'Expiration Date' in schema;
+
+    if (!hasTitleProperty) {
+      throw new Error('Notion database must include a title property named "Name" or "Item".');
+    }
+
+    if (!hasExpirationProperty) {
+      throw new Error(
+        'Notion database must include a date property named "Expiration" or "Expiration Date".'
+      );
+    }
   }
 }
 

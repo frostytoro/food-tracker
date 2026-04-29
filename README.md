@@ -31,21 +31,35 @@ A production-ready Discord bot and lightweight AI agent for tracking food expira
 - [zod](https://zod.dev/)
 - [vitest](https://vitest.dev/)
 
-## Expected Notion Database Properties
+## Supported Notion Database Properties
 
-The bot expects a Notion database with these property names:
+The bot now supports both the original generic schema and the property names from your current Notion setup.
 
-- `Name` (title)
-- `Expiration` (date)
-- `Location` (select or rich text)
-- `Quantity` (rich text or number)
-- `Category` (select or rich text)
-- `Status` (select)
-- `Added By` (rich text)
-- `Notes` (rich text)
-- `Last Updated` (date)
+Supported title property:
 
-Property names are case-sensitive in the current implementation.
+- `Item` or `Name`
+
+Supported expiration date property:
+
+- `Expiration Date` or `Expiration`
+
+Optional supported properties:
+
+- `Category`
+- `Expiration Notes` or `Notes`
+- `Location`
+- `Quantity`
+- `Status`
+- `Added By`
+- `Last edited time` or `Last Updated`
+
+For your current database from the screenshot, the important columns are:
+
+- `Item`
+- `Category`
+- `Expiration Date`
+- `Expiration Notes`
+- `Last edited time`
 
 ## Environment Variables
 
@@ -97,9 +111,23 @@ LOG_LEVEL=info
 
 1. Create a Notion integration at [Notion Integrations](https://www.notion.so/my-integrations).
 2. Copy the integration secret into `NOTION_API_KEY`.
-3. Create the food tracking database with the properties listed above.
+3. Create the food tracking database with at least a title column and expiration date column.
 4. Share the database with the integration.
 5. Copy the database ID into `NOTION_DATABASE_ID`.
+
+For your current setup, use the database ID from the path part of the URL, not the `v=` parameter. Example:
+
+```txt
+https://www.notion.so/6fcb01ceca794188a717b3064dd6b9aa?v=c155e4a18d83416c9143742361596963
+```
+
+Use:
+
+```txt
+NOTION_DATABASE_ID=6fcb01ceca794188a717b3064dd6b9aa
+```
+
+Do not use the `v=` value as the database ID.
 
 ## OpenAI Setup
 
@@ -231,7 +259,7 @@ npm run build
 
 - If slash commands do not appear, rerun `npm run register:commands` and confirm the bot is in the target guild.
 - If plain text messages are ignored, make sure `MESSAGE CONTENT INTENT` is enabled and the channel ID is in `DISCORD_ALLOWED_CHANNEL_IDS`.
-- If Notion writes fail, confirm the database is shared with the integration and the property names match exactly.
+- If Notion writes fail, confirm the database is shared with the integration and that the database includes either `Item` or `Name`, plus either `Expiration Date` or `Expiration`.
 - If audio messages fail, confirm the attachment format is one of the supported OpenAI transcription formats.
 - If reminders do not post, confirm the bot can access the reminder channel and `REMINDER_CRON` is valid.
 - If the bot logs env validation errors at startup, check `.env` for missing required values.
